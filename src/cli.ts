@@ -78,7 +78,8 @@ async function tidyZone(zonePath: string, client: PlanClient, source: string): P
     looseFileCount: index.files.length,
   }
   const strategy = await withSpinner(`Asking ${source} how to tidy`, createStrategy(zone, client))
-  const plan = expandStrategy(index, strategy, zonePath, quarantine, Date.now())
+  const existing = new Set(index.files.map((f) => f.path))
+  const plan = expandStrategy(index, strategy, zonePath, quarantine, Date.now(), existing)
   console.log('\n' + renderPlan(plan) + '\n')
   console.log(rule())
   const answer = await ask(`${PINK('▸')} Apply this plan? ${chalk.dim('[y/N]')} `)
@@ -106,7 +107,12 @@ async function runAudit(opts: { claudeCode?: boolean }): Promise<void> {
   console.log('\n' + renderReport(report) + '\n')
   console.log(rule())
 
-  const zones = sortedZones(report)
+  const known = new Set(audit.zones.map((z) => z.path))
+  const zones = sortedZones(report).filter((z) => known.has(z.path))
+  if (zones.length === 0) {
+    console.log(chalk.dim('No tidyable zones in the report.'))
+    return
+  }
   for (;;) {
     console.log(menuHint())
     const choice = (await ask(`${PINK('▸')} `)).trim().toLowerCase()

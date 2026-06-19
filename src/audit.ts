@@ -79,35 +79,6 @@ export async function auditHome(home: string): Promise<Audit> {
     const z = await zoneStat(join(home, name), name)
     if (z) zones.push(z)
   }
-  // loose files directly under ~ (depth 0 only) as a pseudo-zone
-  const looseAcc: Acc = { files: 0, bytes: 0, byType: {}, bySize: new Map(), biggest: [], loose: 0 }
-  try {
-    const entries = await readdir(home, { withFileTypes: true })
-    for (const entry of entries) {
-      if (!entry.isFile() || entry.name.startsWith('.')) continue
-      const s = await stat(join(home, entry.name)).catch(() => null)
-      if (!s) continue
-      looseAcc.files++
-      looseAcc.bytes += s.size
-      looseAcc.loose++
-      looseAcc.biggest.push({ path: entry.name, bytes: s.size })
-    }
-  } catch {
-    /* ignore */
-  }
-  if (looseAcc.files > 0) {
-    looseAcc.biggest.sort((a, b) => b.bytes - a.bytes)
-    zones.push({
-      path: home,
-      name: 'Home (loose files)',
-      totalFiles: looseAcc.files,
-      totalBytes: looseAcc.bytes,
-      byType: looseAcc.byType,
-      approxDuplicateBytes: 0,
-      biggestFiles: looseAcc.biggest.slice(0, 5),
-      looseFileCount: looseAcc.loose,
-    })
-  }
   // Overview is intentionally left empty in v2: deep-walking ~/Library or
   // /Applications would dominate audit time. Zone sizes already cover the
   // actionable picture. (Cheap overview is future scope.)

@@ -60,6 +60,31 @@ test('expandStrategy de-duplicates colliding destination names', () => {
   expect(dests).toContain('Documents/report-1.pdf')
 })
 
+test('expandStrategy dedupes destination against on-disk existing files', () => {
+  const pdfIndex: Index = {
+    root: '/z',
+    totalFiles: 1,
+    totalBytes: 3,
+    byType: {},
+    duplicates: [],
+    files: [
+      { path: 'invoice.pdf', name: 'invoice.pdf', ext: '.pdf', size: 3, mtime: 0 },
+    ],
+  }
+  const pdfStrategy: Strategy = {
+    summary: 's',
+    folders: [{ name: 'Documents', accepts: ['document'] }],
+    quarantineDuplicates: false,
+    quarantineJunk: false,
+    renameMessy: false,
+  }
+  const existing = new Set(['Documents/invoice.pdf'])
+  const plan = expandStrategy(pdfIndex, pdfStrategy, '/z', '/trash/x', Date.UTC(2026, 5, 19), existing)
+  const moves = plan.operations.filter((o) => o.op === 'move')
+  expect(moves).toHaveLength(1)
+  expect(moves[0]).toMatchObject({ op: 'move', from: 'invoice.pdf', to: 'Documents/invoice-1.pdf' })
+})
+
 test('createStrategy parses compact JSON', async () => {
   const client = {
     complete: async () =>

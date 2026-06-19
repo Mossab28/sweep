@@ -45,19 +45,20 @@ export function expandStrategy(
   target: string,
   quarantine: string,
   now: number,
+  existing: Set<string> = new Set(),
 ): Plan {
   const ops: Operation[] = []
   const createdFolders = new Set<string>()
   const usedDest = new Set<string>()
 
-  // pick a destination path that doesn't collide with an earlier move target
+  // pick a destination path that doesn't collide with an earlier move target or an on-disk file
   const uniqueDest = (dir: string, name: string): string => {
     const dot = name.lastIndexOf('.')
     const base = dot > 0 ? name.slice(0, dot) : name
     const ext = dot > 0 ? name.slice(dot) : ''
     let candidate = `${dir}/${name}`
     let i = 1
-    while (usedDest.has(candidate)) {
+    while (usedDest.has(candidate) || existing.has(candidate)) {
       candidate = `${dir}/${base}-${i}${ext}`
       i++
     }
