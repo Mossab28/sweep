@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:7a1f48,100:ff4fa3&height=170&section=header&text=sweep&fontColor=ffffff&fontSize=72&fontAlignY=34&desc=tidy%20your%20whole%20computer%20with%20AI&descAlignY=56&descSize=18" width="100%" alt="sweep"/>
+<img src="assets/logo.svg" alt="sweep" width="540"/>
 
 **Free, open-source CLI that audits your computer, finds where the clutter lives, and tidies it with Claude — safely.**
 
