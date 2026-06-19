@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import type { Plan, Report } from './types.js'
+import type { Notable, Plan, PlanSummary, Report } from './types.js'
 
 export const PINK = chalk.hex('#ff4fa3')
 
@@ -58,6 +58,83 @@ function boxedReport(body: string[]): string {
 
 export function menuHint(): string {
   return chalk.dim('Pick a number to tidy, ') + PINK('A') + chalk.dim(' to tidy all, ') + PINK('Q') + chalk.dim(' to quit')
+}
+
+const ICON: Record<string, string> = {
+  Documents: '📄', Images: '🖼 ', Videos: '🎬', Audio: '🎵',
+  Archives: '📦', Installers: '💿', Code: '💻', Data: '🗃 ', Other: '🗂 ',
+}
+
+export function renderPlanSummary(summary: PlanSummary, notable: Notable): string {
+  const lines: string[] = []
+  const setAside = summary.quarantine.total
+  lines.push(
+    PINK.bold(
+      `Here's my plan — ${summary.moveCount} files into ${summary.folderCount} folders` +
+        (setAside ? `, ${setAside} set aside.` : '.'),
+    ),
+  )
+  const body: string[] = []
+  for (const g of summary.groups) {
+    if (g.folder === '(root)') continue
+    const icon = ICON[g.folder] ?? '🗂 '
+    const hint = g.exts.length ? chalk.dim(g.exts.join(', ')) : ''
+    body.push(`${icon} ${chalk.bold(g.folder.padEnd(12))} ${PINK(String(g.count).padStart(4))}  ${hint}`)
+  }
+  if (summary.quarantine.total) {
+    const parts: string[] = []
+    if (summary.quarantine.duplicates) parts.push(`${summary.quarantine.duplicates} duplicates`)
+    if (summary.quarantine.junk) parts.push(`${summary.quarantine.junk} junk`)
+    body.push(
+      `${'⌫ '} ${chalk.bold('Quarantine'.padEnd(12))} ${PINK(String(summary.quarantine.total).padStart(4))}  ${chalk.dim(parts.join(' · '))}`,
+    )
+  }
+  lines.push(boxed('Plan', body))
+
+  if (notable.sensitive.length || notable.renames.length || notable.keptCount) {
+    lines.push('')
+    lines.push(PINK('⚠️  Worth a look:'))
+    for (const f of notable.sensitive.slice(0, 5)) {
+      lines.push(`   • ${chalk.bold(f.name)} ${chalk.dim('— looks sensitive; left untouched.')}`)
+    }
+    if (notable.renames.length) {
+      const r = notable.renames[0]
+      const more = notable.renames.length - 1
+      lines.push(
+        `   • ${chalk.dim('renamed:')} ${r.from} ${chalk.dim('→')} ${r.to.split('/').pop()}` +
+          (more > 0 ? chalk.dim(`  (and ${more} more)`) : ''),
+      )
+    }
+    if (notable.keptCount) lines.push(`   • ${chalk.dim(`${notable.keptCount} kept untouched per your request.`)}`)
+  }
+  return lines.join('\n')
+}
+
+export function renderPlanDetail(plan: Plan): string {
+  const byFolder = new Map<string, string[]>()
+  const other: string[] = []
+  for (const op of plan.operations) {
+    if (op.op === 'move' || op.op === 'rename') {
+      const folder = op.to.includes('/') ? op.to.slice(0, op.to.indexOf('/')) : '(root)'
+      const arr = byFolder.get(folder) ?? []
+      arr.push(`${op.from} ${chalk.dim('→')} ${op.to}`)
+      byFolder.set(folder, arr)
+    } else if (op.op === 'quarantine') {
+      other.push(`${PINK('⌫')} ${op.path}`)
+    }
+  }
+  const lines: string[] = []
+  for (const [folder, items] of byFolder) {
+    lines.push(PINK.bold(folder))
+    for (const it of items.slice(0, 20)) lines.push(`  ${it}`)
+    if (items.length > 20) lines.push(chalk.dim(`  …and ${items.length - 20} more`))
+  }
+  if (other.length) {
+    lines.push(PINK.bold('Quarantine'))
+    for (const it of other.slice(0, 20)) lines.push(`  ${it}`)
+    if (other.length > 20) lines.push(chalk.dim(`  …and ${other.length - 20} more`))
+  }
+  return lines.join('\n')
 }
 
 export function renderPlan(plan: Plan): string {
