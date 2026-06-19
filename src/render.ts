@@ -4,15 +4,15 @@ import type { Plan } from './types.js'
 export const PINK = chalk.hex('#ff4fa3')
 
 export function banner(): string {
-  return PINK.bold(
-    [
-      '                          ',
-      '   ___ _ _____ ___ ___ ___ ',
-      '  (_-</ | / -_) -_) _ \\___|',
-      ' /___/\\_/\\___/\\__/ .__/    ',
-      "                 sweep — tidy your files with AI",
-    ].join('\n'),
-  )
+  const art = [
+    '███████╗██╗    ██╗███████╗███████╗██████╗ ',
+    '██╔════╝██║    ██║██╔════╝██╔════╝██╔══██╗',
+    '███████╗██║ █╗ ██║█████╗  █████╗  ██████╔╝',
+    '╚════██║██║███╗██║██╔══╝  ██╔══╝  ██╔═══╝ ',
+    '███████║╚███╔███╔╝███████╗███████╗██║     ',
+    '╚══════╝ ╚══╝╚══╝ ╚══════╝╚══════╝╚═╝     ',
+  ]
+  return PINK.bold(art.join('\n')) + chalk.dim('\n        tidy your files with AI')
 }
 
 export function renderPlan(plan: Plan): string {
