@@ -20,13 +20,13 @@
 Got **[Claude Code](https://claude.com/claude-code)** installed and logged in? That's it — sweep uses your subscription **by default**. No API key, no flag:
 
 ```bash
-npx @mossab/sweep
+npx @mossab28/sweep
 ```
 
 Prefer the API? Set a [Claude API key](https://console.anthropic.com/) and add `--api`:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep --api
+ANTHROPIC_API_KEY=sk-ant-... npx @mossab28/sweep --api
 ```
 
 ### Install the `sweep` command everywhere
@@ -37,7 +37,7 @@ Want `sweep` on your PATH (not just `npx`)? Install it straight from GitHub — 
 npm install -g github:Mossab28/sweep
 ```
 
-Now run `sweep` from any folder. *(Once published to npm: `npm install -g @mossab/sweep`.)*
+Now run `sweep` from any folder. *(Once published to npm: `npm install -g @mossab28/sweep`.)*
 
 sweep audits your content folders, shows a ranked report, and hands you a menu:
 
