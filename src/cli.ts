@@ -5,7 +5,7 @@ import { stdin, stdout } from 'node:process'
 import { Command, Option } from 'commander'
 import chalk from 'chalk'
 import { VERSION } from './index.js'
-import { banner, PINK, renderPlan, rule, renderReport, menuHint, sortedZones } from './render.js'
+import { banner, PINK, renderPlan, renderPlanSummary, renderPlanDetail, rule, renderReport, menuHint, sortedZones } from './render.js'
 import { scan } from './scanner.js'
 import { assertScannableTarget } from './safety.js'
 import {
@@ -17,7 +17,10 @@ import {
 } from './planner.js'
 import { execute, applyUndo } from './executor.js'
 import { deleteUndoLog, loadLatestUndoLog, quarantineDir, saveUndoLog } from './store.js'
-import type { Intent, IntentMode } from './types.js'
+import { summarizePlan } from './summarize.js'
+import { findSensitive } from './sensitive.js'
+import { refineTurn } from './converse.js'
+import type { ConversationTurn, Index, Intent, IntentMode, Notable, Plan, Rename, Strategy, ZoneStat } from './types.js'
 import { auditHome, defaultHome } from './audit.js'
 import { createReport } from './report.js'
 import { createStrategy, expandStrategy } from './strategy.js'
@@ -90,6 +93,61 @@ async function pickClient(opts: {
   process.exit(1)
 }
 
+function notableFrom(plan: Plan, index: Index): Notable {
+  const renames: Rename[] = []
+  for (const op of plan.operations) {
+    if (op.op === 'move' || op.op === 'rename') {
+      const fromBase = op.from.split('/').pop() ?? op.from
+      const toBase = op.to.split('/').pop() ?? op.to
+      if (fromBase !== toBase) renames.push({ from: op.from, to: op.to })
+    }
+  }
+  return { sensitive: findSensitive(index), renames, keptCount: 0 }
+}
+
+/**
+ * Show the plan as a Claude-style summary and run the y/d/n/chat loop.
+ * Returns the plan to apply, or null if the user cancelled.
+ */
+async function confirmPlan(
+  initial: Plan,
+  ctx: { index: Index; zone: ZoneStat; target: string; quarantine: string; now: number; client: PlanClient; source: string; existing: Set<string> },
+): Promise<Plan | null> {
+  let plan = initial
+  const history: ConversationTurn[] = []
+  for (;;) {
+    const summary = summarizePlan(plan, ctx.index, ctx.now)
+    const notable = notableFrom(plan, ctx.index)
+    console.log('\n' + renderPlanSummary(summary, notable) + '\n')
+    console.log(rule())
+    const choice = await ask(
+      `${PINK('▸')} ${chalk.dim('[y] apply · [d] details · [n] cancel · or tell me what to change')} `,
+    )
+    const c = choice.trim()
+    if (c === '' || c.toLowerCase() === 'n') return null
+    if (c.toLowerCase() === 'y') return plan
+    if (c.toLowerCase() === 'd') {
+      console.log('\n' + renderPlanDetail(plan) + '\n')
+      continue
+    }
+    // chat turn
+    history.push({ role: 'user', text: c })
+    const summaryText = `${summary.moveCount} moves into ${summary.folderCount} folders, ${summary.quarantine.total} quarantined`
+    let turn
+    try {
+      turn = await withSpinner(`Asking ${ctx.source}`, refineTurn(ctx.zone, summaryText, history, c, ctx.client))
+    } catch (err) {
+      console.log(chalk.dim((err as Error).message))
+      continue
+    }
+    history.push({ role: 'assistant', text: turn.reply })
+    console.log('\n' + PINK(turn.reply))
+    if (turn.strategy) {
+      plan = expandStrategy(ctx.index, turn.strategy as Strategy, ctx.target, ctx.quarantine, ctx.now, ctx.existing)
+    }
+  }
+}
+
 async function tidyZone(zonePath: string, client: PlanClient, source: string): Promise<void> {
   assertScannableTarget(zonePath)
   const index = await withSpinner(`Scanning ${zonePath}`, scan(zonePath))
@@ -108,14 +166,21 @@ async function tidyZone(zonePath: string, client: PlanClient, source: string): P
   const strategy = await withSpinner(`Asking ${source} how to tidy`, createStrategy(zone, client))
   const existing = new Set(index.files.map((f) => f.path))
   const plan = expandStrategy(index, strategy, zonePath, quarantine, Date.now(), existing)
-  console.log('\n' + renderPlan(plan) + '\n')
-  console.log(rule())
-  const answer = await ask(`${PINK('▸')} Apply this plan? ${chalk.dim('[y/N]')} `)
-  if (answer.toLowerCase() !== 'y') {
+  const final = await confirmPlan(plan, {
+    index,
+    zone,
+    target: zonePath,
+    quarantine,
+    now: Date.now(),
+    client,
+    source,
+    existing,
+  })
+  if (!final) {
     console.log(chalk.dim('Skipped. Nothing changed.'))
     return
   }
-  const log = await withSpinner('Applying', execute(plan, zonePath, quarantine, stamp))
+  const log = await withSpinner('Applying', execute(final, zonePath, quarantine, stamp))
   await saveUndoLog(log)
   console.log(`${PINK('✓')} Tidied ${zonePath}. Run ${chalk.bold('sweep undo')} to revert.`)
 }

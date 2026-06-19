@@ -116,6 +116,8 @@ export interface Strategy {
   quarantineDuplicates: boolean
   quarantineJunk: boolean
   renameMessy: boolean
+  /** filename substrings to leave untouched (e.g. ["screenshot"]) */
+  keep?: string[]
 }
 
 export interface ReportZone {
@@ -131,4 +133,44 @@ export interface ReportZone {
 export interface Report {
   summary: string
   zones: ReportZone[]
+}
+
+export interface SummaryGroup {
+  /** destination top folder, e.g. "Documents" */
+  folder: string
+  count: number
+  /** a few representative extensions, e.g. [".pdf", ".docx"] */
+  exts: string[]
+}
+
+export interface QuarantineBreakdown {
+  total: number
+  duplicates: number
+  junk: number
+}
+
+export interface PlanSummary {
+  moveCount: number
+  folderCount: number
+  groups: SummaryGroup[]
+  quarantine: QuarantineBreakdown
+}
+
+export interface Rename {
+  from: string
+  to: string
+}
+
+export interface Notable {
+  /** sensitive files left untouched */
+  sensitive: FileEntry[]
+  /** files whose name was tidied during a move */
+  renames: Rename[]
+  /** count of files left in place because of a `keep` rule */
+  keptCount: number
+}
+
+export interface ConversationTurn {
+  role: 'user' | 'assistant'
+  text: string
 }

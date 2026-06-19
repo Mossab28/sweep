@@ -85,6 +85,36 @@ test('expandStrategy dedupes destination against on-disk existing files', () => 
   expect(moves[0]).toMatchObject({ op: 'move', from: 'invoice.pdf', to: 'Documents/invoice-1.pdf' })
 })
 
+test('expandStrategy never touches a sensitive file', () => {
+  const idx: Index = {
+    root: '/z', totalFiles: 2, totalBytes: 2, byType: {}, duplicates: [],
+    files: [
+      { path: '.env', name: '.env', ext: '', size: 1, mtime: 0 },
+      { path: 'a.png', name: 'a.png', ext: '.png', size: 1, mtime: 0 },
+    ],
+  }
+  const plan = expandStrategy(idx, strategy, '/z', '/trash/x', Date.UTC(2026, 5, 19))
+  const touched = plan.operations.some(
+    (o) => (o.op === 'move' && o.from === '.env') || (o.op === 'quarantine' && o.path === '.env'),
+  )
+  expect(touched).toBe(false)
+})
+
+test('expandStrategy leaves keep-matched files untouched', () => {
+  const idx: Index = {
+    root: '/z', totalFiles: 2, totalBytes: 2, byType: {}, duplicates: [],
+    files: [
+      { path: 'screenshot-1.png', name: 'screenshot-1.png', ext: '.png', size: 1, mtime: 0 },
+      { path: 'photo.png', name: 'photo.png', ext: '.png', size: 1, mtime: 0 },
+    ],
+  }
+  const keepStrategy = { ...strategy, keep: ['screenshot'] }
+  const plan = expandStrategy(idx, keepStrategy, '/z', '/trash/x', Date.UTC(2026, 5, 19))
+  const movedFrom = plan.operations.filter((o) => o.op === 'move').map((o) => (o.op === 'move' ? o.from : ''))
+  expect(movedFrom).toContain('photo.png')
+  expect(movedFrom).not.toContain('screenshot-1.png')
+})
+
 test('createStrategy parses compact JSON', async () => {
   const client = {
     complete: async () =>
