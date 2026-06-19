@@ -57,6 +57,25 @@ export function anthropicClient(apiKey: string): PlanClient {
  */
 export const CLAUDE_CODE_TIMEOUT_MS = 300_000
 
+/** True if the `claude` CLI is installed and runnable (used to default to the subscription). */
+export function claudeCodeAvailable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn('claude', ['--version'], { stdio: 'ignore' })
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      resolve(false)
+    }, 5000)
+    child.on('error', () => {
+      clearTimeout(timer)
+      resolve(false)
+    })
+    child.on('close', (code) => {
+      clearTimeout(timer)
+      resolve(code === 0)
+    })
+  })
+}
+
 export function claudeCodeClient(model?: string): PlanClient {
   return {
     complete(prompt: string): Promise<string> {

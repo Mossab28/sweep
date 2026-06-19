@@ -8,7 +8,13 @@ import { VERSION } from './index.js'
 import { banner, PINK, renderPlan, rule, renderReport, menuHint, sortedZones } from './render.js'
 import { scan } from './scanner.js'
 import { assertScannableTarget } from './safety.js'
-import { anthropicClient, claudeCodeClient, createPlan, type PlanClient } from './planner.js'
+import {
+  anthropicClient,
+  claudeCodeAvailable,
+  claudeCodeClient,
+  createPlan,
+  type PlanClient,
+} from './planner.js'
 import { execute, applyUndo } from './executor.js'
 import { deleteUndoLog, loadLatestUndoLog, quarantineDir, saveUndoLog } from './store.js'
 import type { Intent, IntentMode } from './types.js'
@@ -48,18 +54,40 @@ async function withSpinner<T>(label: string, work: Promise<T>): Promise<T> {
   }
 }
 
-function pickClient(opts: { claudeCode?: boolean }): PlanClient {
-  if (opts.claudeCode) return claudeCodeClient()
+/**
+ * Choose the AI backend. Default: your Claude Code subscription (auto-detected).
+ * The API is used only when you pass --api. Falls back to the API key only if
+ * Claude Code isn't installed.
+ */
+async function pickClient(opts: {
+  claudeCode?: boolean
+  api?: boolean
+}): Promise<{ client: PlanClient; label: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    console.error(
-      PINK(
-        'Set ANTHROPIC_API_KEY (your Claude API key), or pass --claude-code to use your logged-in Claude Code session instead.',
-      ),
-    )
-    process.exit(1)
+
+  // Explicit API mode.
+  if (opts.api) {
+    if (!apiKey) {
+      console.error(PINK('--api needs ANTHROPIC_API_KEY set (your Claude API key).'))
+      process.exit(1)
+    }
+    return { client: anthropicClient(apiKey), label: 'Claude (API)' }
   }
-  return anthropicClient(apiKey)
+
+  // Default: Claude Code subscription if available (or forced with -c).
+  if (opts.claudeCode || (await claudeCodeAvailable())) {
+    return { client: claudeCodeClient(), label: 'Claude Code' }
+  }
+
+  // No Claude Code — fall back to an API key if the user has one.
+  if (apiKey) return { client: anthropicClient(apiKey), label: 'Claude (API)' }
+
+  console.error(
+    PINK('sweep uses Claude Code (your subscription) by default.\n') +
+      `Install it → ${chalk.underline('https://claude.com/claude-code')} and run \`claude\` once to log in.\n` +
+      chalk.dim('Or set ANTHROPIC_API_KEY and re-run with --api to use the Claude API.'),
+  )
+  process.exit(1)
 }
 
 async function tidyZone(zonePath: string, client: PlanClient, source: string): Promise<void> {
@@ -92,9 +120,8 @@ async function tidyZone(zonePath: string, client: PlanClient, source: string): P
   console.log(`${PINK('✓')} Tidied ${zonePath}. Run ${chalk.bold('sweep undo')} to revert.`)
 }
 
-async function runAudit(opts: { claudeCode?: boolean }): Promise<void> {
-  const client = pickClient(opts)
-  const source = opts.claudeCode ? 'Claude Code' : 'Claude'
+async function runAudit(opts: { claudeCode?: boolean; api?: boolean }): Promise<void> {
+  const { client, label: source } = await pickClient(opts)
   console.log('\n' + banner() + '\n')
   console.log(rule())
   const home = defaultHome()
@@ -139,9 +166,9 @@ async function runAudit(opts: { claudeCode?: boolean }): Promise<void> {
 
 async function runTidy(
   target: string,
-  opts: { mode?: string; instruction?: string; claudeCode?: boolean },
+  opts: { mode?: string; instruction?: string; claudeCode?: boolean; api?: boolean },
 ) {
-  const client = pickClient(opts)
+  const { client, label: source } = await pickClient(opts)
   const abs = resolve(target)
   assertScannableTarget(abs)
 
@@ -167,7 +194,6 @@ async function runTidy(
 
   const stamp = nowStamp()
   const quarantine = quarantineDir(stamp)
-  const source = opts.claudeCode ? 'Claude Code' : 'Claude'
   const plan = await withSpinner(
     `Asking ${source} for a plan`,
     createPlan(index, intent, abs, quarantine, client),
@@ -205,7 +231,8 @@ program
   .argument('[path]', 'folder to tidy (omit to audit your whole computer)')
   .addOption(new Option('-m, --mode <mode>', 'clean | organize').choices(['clean', 'organize']).default('organize'))
   .option('-i, --instruction <text>', 'free-form instruction (custom mode)')
-  .option('-c, --claude-code', 'use your logged-in Claude Code session instead of an API key')
+  .option('-c, --claude-code', 'force your Claude Code subscription (default when installed)')
+  .option('--api', 'use the Claude API (needs ANTHROPIC_API_KEY) instead of the subscription')
   .action((path, opts) => (path ? runTidy(path, opts) : runAudit(opts)))
 
 program.command('undo').description('revert the last run').action(runUndo)

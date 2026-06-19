@@ -17,16 +17,16 @@
 
 ## ⚡ Quick start
 
-No install, no API key needed if you have **[Claude Code](https://claude.com/claude-code)**:
+Got **[Claude Code](https://claude.com/claude-code)** installed and logged in? That's it — sweep uses your subscription **by default**. No API key, no flag:
 
 ```bash
-npx @mossab/sweep --claude-code
+npx @mossab/sweep
 ```
 
-…or bring your own [Claude API key](https://console.anthropic.com/):
+Prefer the API? Set a [Claude API key](https://console.anthropic.com/) and add `--api`:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep
+ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep --api
 ```
 
 sweep audits your content folders, shows a ranked report, and hands you a menu:
@@ -58,7 +58,7 @@ Pick a number to tidy that zone, **`A`** to tidy everything, **`Q`** to quit.
 **Audit the whole computer** (the headline flow):
 
 ```bash
-sweep                # or: sweep -c   (Claude Code subscription)
+sweep                # uses your Claude Code subscription by default
 ```
 
 **Tidy one folder directly:**
@@ -96,7 +96,7 @@ sweep undo
 ## ✅ Requirements
 
 - Node.js **≥ 20**
-- **Either** a Claude API key (`ANTHROPIC_API_KEY`) — get one at [console.anthropic.com](https://console.anthropic.com/) — **or** [Claude Code](https://claude.com/claude-code) installed and logged in, then run with `--claude-code`.
+- **[Claude Code](https://claude.com/claude-code)** installed and logged in (the default — nothing else needed), **or** a Claude API key (`ANTHROPIC_API_KEY`) used with `--api` — get one at [console.anthropic.com](https://console.anthropic.com/).
 
 ---
 
