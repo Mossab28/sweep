@@ -27,6 +27,15 @@ test('returns a validated plan from the client response', async () => {
   expect(plan.operations).toHaveLength(2)
 })
 
+test('rejects with friendly error when client returns non-JSON', async () => {
+  const client = {
+    complete: async () => "sorry, I can't help with that",
+  }
+  await expect(
+    createPlan(index, { mode: 'organize' }, '/tmp/target', '/tmp/.sweep/trash/x', client),
+  ).rejects.toThrow(/valid plan/i)
+})
+
 test('rejects an out-of-bounds plan from the model', async () => {
   const client = {
     complete: async () =>

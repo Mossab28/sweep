@@ -16,7 +16,12 @@ export async function createPlan(
 ): Promise<Plan> {
   const prompt = buildPrompt(index, intent)
   const raw = await client.complete(prompt)
-  const plan = parsePlan(raw.trim())
+  let plan
+  try {
+    plan = parsePlan(raw.trim())
+  } catch {
+    throw new Error('Claude did not return a valid plan (expected JSON). Please try again.')
+  }
   assertPlanWithinBounds(plan, target, quarantine)
   return plan
 }

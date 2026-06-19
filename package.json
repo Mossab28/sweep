@@ -6,10 +6,12 @@
   "type": "module",
   "bin": { "sweep": "dist/cli.js" },
   "engines": { "node": ">=20" },
+  "files": ["dist"],
   "scripts": {
     "test": "vitest run",
     "build": "tsup src/cli.ts --format esm --target node20 --clean",
-    "dev": "tsx src/cli.ts"
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

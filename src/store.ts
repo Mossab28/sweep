@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { UndoLog } from './types.js'
@@ -21,6 +21,14 @@ export async function saveUndoLog(log: UndoLog): Promise<string> {
   const path = join(dir, `${log.timestamp}.json`)
   await writeFile(path, JSON.stringify(log, null, 2))
   return path
+}
+
+export async function deleteUndoLog(timestamp: string): Promise<void> {
+  try {
+    await rm(join(undoDir(), `${timestamp}.json`))
+  } catch {
+    // already gone — ignore
+  }
 }
 
 export async function loadLatestUndoLog(): Promise<UndoLog | null> {

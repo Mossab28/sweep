@@ -2,14 +2,14 @@
 import { resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout } from 'node:process'
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import { VERSION } from './index.js'
 import { banner, PINK, renderPlan } from './render.js'
 import { scan } from './scanner.js'
 import { assertScannableTarget } from './safety.js'
 import { anthropicClient, createPlan } from './planner.js'
 import { execute, applyUndo } from './executor.js'
-import { loadLatestUndoLog, quarantineDir, saveUndoLog } from './store.js'
+import { deleteUndoLog, loadLatestUndoLog, quarantineDir, saveUndoLog } from './store.js'
 import type { Intent, IntentMode } from './types.js'
 
 async function ask(question: string): Promise<string> {
@@ -69,6 +69,7 @@ async function runUndo() {
     return
   }
   await applyUndo(log)
+  await deleteUndoLog(log.timestamp)
   console.log(PINK(`Reverted the run from ${log.timestamp}.`))
 }
 
@@ -77,7 +78,7 @@ program.name('sweep').description('AI-powered file cleanup & organizer').version
 
 program
   .argument('<path>', 'folder to tidy')
-  .option('-m, --mode <mode>', 'clean | organize', 'organize')
+  .addOption(new Option('-m, --mode <mode>', 'clean | organize').choices(['clean', 'organize']).default('organize'))
   .option('-i, --instruction <text>', 'free-form instruction (custom mode)')
   .action((path, opts) => runTidy(path, opts))
 
