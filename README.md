@@ -1,80 +1,81 @@
-# 🩷 sweep
+<div align="center">
 
-**AI-powered file cleanup & organizer — free, open-source, runs in your terminal.**
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:7a1f48,100:ff4fa3&height=170&section=header&text=sweep&fontColor=ffffff&fontSize=72&fontAlignY=34&desc=tidy%20your%20whole%20computer%20with%20AI&descAlignY=56&descSize=18" width="100%" alt="sweep"/>
 
-> Point it at a messy folder. Claude makes a plan. You approve it. Done.
+**Free, open-source CLI that audits your computer, finds where the clutter lives, and tidies it with Claude — safely.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-ff4fa3?style=for-the-badge)](#license)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A520-339933?style=for-the-badge&logo=node.js&logoColor=white)](#requirements)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](#)
+[![Built with Claude](https://img.shields.io/badge/built%20with-Claude-D97757?style=for-the-badge&logo=anthropic&logoColor=white)](https://claude.com/claude-code)
+
+</div>
+
+> Run `sweep`. It scans your folders, tells you where the gigabytes and mess are — worst first — and tidies them one click at a time. Nothing moves without your `y`. Everything is undoable.
 
 ---
 
-## Safety first
+## ⚡ Quick start
 
-sweep is designed to be safe by default:
+No install, no API key needed if you have **[Claude Code](https://claude.com/claude-code)**:
 
-- **Dry-run before anything moves** — you see the full plan and confirm `y/N` before a single file is touched.
-- **No real deletion** — files marked for removal are quarantined to `~/.sweep/trash/<timestamp>/`, never permanently deleted.
+```bash
+npx @mossab/sweep --claude-code
+```
+
+…or bring your own [Claude API key](https://console.anthropic.com/):
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep
+```
+
+sweep audits your content folders, shows a ranked report, and hands you a menu:
+
+```text
+╭─ Report ──────────────────────────────────────────────╮
+│ 1) Downloads    1.6 GB · 760 files · ~200 MB duplicates │
+│ 2) Desktop      820 MB · 240 files · very messy         │
+│ 3) Pictures     3.1 GB · sorted, minor cleanup          │
+╰────────────────────────────────────────────────────────╯
+  Pick a number to tidy, A to tidy all, Q to quit
+```
+
+Pick a number to tidy that zone, **`A`** to tidy everything, **`Q`** to quit.
+
+---
+
+## 🛡️ Safe by default
+
+- **Dry-run first** — you see the full plan and confirm `y/N` before a single file moves.
+- **No real deletion** — "deleted" files are quarantined to `~/.sweep/trash/<timestamp>/`.
 - **Full undo** — `sweep undo` reverts the last run instantly.
-- **Refuses dangerous targets** — sweep will not operate on `/` or your bare home directory (`~`), and automatically skips system/noise directories (`node_modules`, `.git`, etc.).
+- **Bounded** — tidying only ever touches your content folders. sweep refuses `/` and your bare home, and skips system/noise dirs (`node_modules`, `.git`, …). The audit is read-only.
 
 ---
 
-## Quick start
+## 🎯 Usage
 
-You need your own [Claude API key](https://console.anthropic.com/).
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep ~/Downloads
-```
-
-That's it. sweep scans the folder, asks Claude for a tidy plan, shows it to you, and waits for your `y` before doing anything.
-
-### No API key? Use your Claude Code subscription
-
-If you have [Claude Code](https://claude.com/claude-code) installed and logged in, pass `--claude-code` (`-c`) and sweep will ask Claude through your existing subscription — no API key, no per-token cost:
+**Audit the whole computer** (the headline flow):
 
 ```bash
-npx @mossab/sweep ~/Downloads --claude-code
+sweep                # or: sweep -c   (Claude Code subscription)
 ```
 
----
-
-## Usage
-
-### Audit your whole computer
-
-Run sweep with no folder and it scans your content folders, reports where the
-clutter and gigabytes are (worst first), and lets you tidy them one at a time —
-or all at once:
+**Tidy one folder directly:**
 
 ```bash
-sweep            # or: sweep --claude-code
+sweep ~/Downloads                 # organize (default)
+sweep ~/Downloads --mode clean    # junk, duplicates, clutter
 ```
 
-Then pick a number to tidy that zone, `A` to tidy everything, or `Q` to quit.
-Tidying only ever touches your content folders, never system files.
-
-### Modes
-
-```bash
-# Organize (default) — group and sort files into logical folders
-sweep ~/Downloads
-
-# Clean — remove junk, duplicates, and clutter
-sweep ~/Downloads --mode clean
-```
-
-### Custom instruction
-
-Use `-i` to tell sweep exactly what you want:
+**Free-form instruction:**
 
 ```bash
 sweep ~/Photos -i "sort photos by year"
-sweep ~/Documents -i "archive anything older than 2023"
-sweep ~/Desktop -i "keep only PDFs, move everything else to a subfolder"
+sweep ~/Desktop -i "keep only PDFs, move the rest into a subfolder"
 ```
 
-### Undo
-
-Revert the most recent run at any time:
+**Undo the last run:**
 
 ```bash
 sweep undo
@@ -82,23 +83,27 @@ sweep undo
 
 ---
 
-## How it works
+## 🔍 How it works
 
-1. **Local scan** — sweep reads file names, sizes, dates, types, and duplicate hashes from your folder. Nothing is sent to Claude except a compact summary.
-2. **AI plan** — Claude returns a structured JSON plan describing every move.
-3. **You confirm** — the plan is displayed; nothing happens until you type `y`.
-4. **Execute** — files are moved or quarantined according to the plan.
-5. **Undo** — run `sweep undo` to restore everything to where it was.
+1. **Local scan** — sweep reads names, sizes, dates, types and duplicate hashes. Only a **compact summary** ever leaves your machine.
+2. **AI plan** — Claude returns a short report and a compact tidy *strategy* (folder taxonomy + rules) — never one instruction per file, so it stays fast on huge folders.
+3. **Local expansion** — sweep turns that strategy into a concrete move/quarantine plan on your machine.
+4. **You confirm** — nothing happens until you type `y`.
+5. **Execute & undo** — files are moved or quarantined; `sweep undo` puts everything back.
+
+---
+
+## ✅ Requirements
+
+- Node.js **≥ 20**
+- **Either** a Claude API key (`ANTHROPIC_API_KEY`) — get one at [console.anthropic.com](https://console.anthropic.com/) — **or** [Claude Code](https://claude.com/claude-code) installed and logged in, then run with `--claude-code`.
 
 ---
 
-## Requirements
+## 🤝 Contributing
 
-- Node.js >= 20
-- **Either** a Claude API key (set via `ANTHROPIC_API_KEY`) — get one at [console.anthropic.com](https://console.anthropic.com/) — **or** [Claude Code](https://claude.com/claude-code) installed and logged in, then run with `--claude-code`.
-
----
+Issues and PRs welcome. `npm install` then `npm test` (vitest). The codebase is small, typed, and modular — start in `src/`.
 
 ## License
 
-MIT © 2026 Mossab
+MIT © 2026 Mossab — see [`LICENSE`](LICENSE).
