@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { extToCategory, isJunk, isMessyName, tidyName } from './categorize.js'
+import { isSensitive } from './sensitive.js'
 import { stripFences, type PlanClient } from './planner.js'
 import { assertPlanWithinBounds } from './schema.js'
 import type { Index, Operation, Plan, Strategy, ZoneStat } from './types.js'
@@ -14,6 +15,7 @@ const StrategySchema = z.object({
   quarantineDuplicates: z.boolean(),
   quarantineJunk: z.boolean(),
   renameMessy: z.boolean(),
+  keep: z.array(z.string()).optional(),
 })
 
 export function buildStrategyPrompt(zone: ZoneStat): string {
@@ -66,11 +68,16 @@ export function expandStrategy(
     return candidate
   }
 
+  const keep = strategy.keep ?? []
+  const isKept = (name: string): boolean => keep.some((k) => name.toLowerCase().includes(k.toLowerCase()))
+
   // duplicates: keep the first path of each group, quarantine the rest
   const quarantined = new Set<string>()
   if (strategy.quarantineDuplicates) {
     for (const group of index.duplicates) {
       for (const p of group.paths.slice(1)) {
+        const base = p.split('/').pop() ?? p
+        if (isSensitive(p) || isSensitive(base) || isKept(base)) continue
         ops.push({ op: 'quarantine', path: p })
         quarantined.add(p)
       }
@@ -78,6 +85,7 @@ export function expandStrategy(
   }
 
   for (const file of index.files) {
+    if (isSensitive(file.path) || isSensitive(file.name) || isKept(file.name)) continue
     if (quarantined.has(file.path)) continue
     if (strategy.quarantineJunk && isJunk(file, now)) {
       ops.push({ op: 'quarantine', path: file.path })
