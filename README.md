@@ -91,6 +91,19 @@ sweep ~/Desktop -i "keep only PDFs, move the rest into a subfolder"
 sweep undo
 ```
 
+### Talk to it
+
+When sweep shows a plan, you don't have to take it as-is. Type what you want and
+it adjusts — then re-shows the plan:
+
+```text
+[y] apply · [d] details · [n] cancel · or tell me what to change
+▸ clean everything except the screenshots
+```
+
+It can ask you questions too, and it leaves anything that looks sensitive
+(recovery codes, `.env`, keys) untouched.
+
 ---
 
 ## 🔍 How it works
