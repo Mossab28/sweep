@@ -111,7 +111,7 @@ function notableFrom(plan: Plan, index: Index): Notable {
  */
 async function confirmPlan(
   initial: Plan,
-  ctx: { index: Index; zone: ZoneStat; target: string; quarantine: string; now: number; client: PlanClient; source: string },
+  ctx: { index: Index; zone: ZoneStat; target: string; quarantine: string; now: number; client: PlanClient; source: string; existing: Set<string> },
 ): Promise<Plan | null> {
   let plan = initial
   const history: ConversationTurn[] = []
@@ -143,7 +143,7 @@ async function confirmPlan(
     history.push({ role: 'assistant', text: turn.reply })
     console.log('\n' + PINK(turn.reply))
     if (turn.strategy) {
-      plan = expandStrategy(ctx.index, turn.strategy as Strategy, ctx.target, ctx.quarantine, ctx.now)
+      plan = expandStrategy(ctx.index, turn.strategy as Strategy, ctx.target, ctx.quarantine, ctx.now, ctx.existing)
     }
   }
 }
@@ -174,6 +174,7 @@ async function tidyZone(zonePath: string, client: PlanClient, source: string): P
     now: Date.now(),
     client,
     source,
+    existing,
   })
   if (!final) {
     console.log(chalk.dim('Skipped. Nothing changed.'))
