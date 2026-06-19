@@ -145,6 +145,19 @@ All filesystem tests run against temp fixture directories. No network in tests.
 - README oriented for adoption: one-line value prop, demo GIF/asciinema,
   `npx @mossab/sweep ~/Downloads`, safety guarantees front and center.
 
+## 9b. Visual identity (DA)
+
+Brand palette: **black + pink**. Applied consistently across:
+
+- **CLI output** — dark/black background assumed; pink (magenta/hot-pink ANSI,
+  256-color or truecolor with graceful fallback to standard magenta) as the
+  accent for prompts, the `sweep` banner/logo, progress, and confirmations.
+  Neutral grey for secondary text; conventional green/red only for
+  success/warning where clarity demands it.
+- **ASCII banner** shown on launch, in pink.
+- **README** — pink accent in logo/badges on a dark theme; demo GIF/asciinema
+  using the same palette.
+
 ## 10. Future (out of scope for v1)
 
 - GUI (Tauri/Electron) once the CLI proves the concept.
