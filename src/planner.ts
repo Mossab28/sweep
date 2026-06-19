@@ -55,6 +55,8 @@ export function anthropicClient(apiKey: string): PlanClient {
  * (`claude -p`), using the user's logged-in Claude Code session instead of an
  * API key. The prompt is piped via stdin to avoid argv length limits.
  */
+export const CLAUDE_CODE_TIMEOUT_MS = 300_000
+
 export function claudeCodeClient(model?: string): PlanClient {
   return {
     complete(prompt: string): Promise<string> {
@@ -64,6 +66,23 @@ export function claudeCodeClient(model?: string): PlanClient {
         const child = spawn('claude', args, { stdio: ['pipe', 'pipe', 'pipe'] })
         let out = ''
         let err = ''
+        let settled = false
+        const finish = (fn: () => void) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          fn()
+        }
+        const timer = setTimeout(() => {
+          child.kill('SIGKILL')
+          finish(() =>
+            reject(
+              new Error(
+                `Claude Code took too long (>${CLAUDE_CODE_TIMEOUT_MS / 1000}s). The folder may be too large — try a smaller folder, or narrow it with -i "your instruction".`,
+              ),
+            ),
+          )
+        }, CLAUDE_CODE_TIMEOUT_MS)
         child.stdout.on('data', (d) => {
           out += d
         })
@@ -71,15 +90,19 @@ export function claudeCodeClient(model?: string): PlanClient {
           err += d
         })
         child.on('error', (e) =>
-          reject(
-            new Error(
-              `Could not run the \`claude\` CLI (${e.message}). Install Claude Code and run \`claude\` once to log in.`,
+          finish(() =>
+            reject(
+              new Error(
+                `Could not run the \`claude\` CLI (${e.message}). Install Claude Code and run \`claude\` once to log in.`,
+              ),
             ),
           ),
         )
         child.on('close', (code) => {
-          if (code === 0) resolve(out)
-          else reject(new Error(`claude CLI exited with code ${code}: ${err.trim()}`))
+          finish(() => {
+            if (code === 0) resolve(out)
+            else reject(new Error(`claude CLI exited with code ${code}: ${err.trim()}`))
+          })
         })
         child.stdin.write(prompt)
         child.stdin.end()

@@ -3,8 +3,9 @@ import { resolve } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { stdin, stdout } from 'node:process'
 import { Command, Option } from 'commander'
+import chalk from 'chalk'
 import { VERSION } from './index.js'
-import { banner, PINK, renderPlan } from './render.js'
+import { banner, PINK, renderPlan, rule } from './render.js'
 import { scan } from './scanner.js'
 import { assertScannableTarget } from './safety.js'
 import { anthropicClient, claudeCodeClient, createPlan, type PlanClient } from './planner.js'
@@ -21,6 +22,27 @@ async function ask(question: string): Promise<string> {
 
 function nowStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-')
+}
+
+/** Show an animated spinner with an elapsed-seconds counter while `work` runs. */
+async function withSpinner<T>(label: string, work: Promise<T>): Promise<T> {
+  if (!stdout.isTTY) {
+    console.log(PINK(`${label} ...`))
+    return work
+  }
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  const start = Date.now()
+  let i = 0
+  const timer = setInterval(() => {
+    const secs = Math.floor((Date.now() - start) / 1000)
+    stdout.write(`\r${PINK(frames[i++ % frames.length])} ${label} ${chalk.dim(`${secs}s`)}   `)
+  }, 90)
+  try {
+    return await work
+  } finally {
+    clearInterval(timer)
+    stdout.write('\r' + ' '.repeat(label.length + 16) + '\r')
+  }
 }
 
 async function runTidy(
@@ -53,26 +75,38 @@ async function runTidy(
     intent = { mode }
   }
 
-  console.log(banner())
-  console.log(PINK(`\nScanning ${abs} ...`))
-  const index = await scan(abs)
-  console.log(`Found ${index.totalFiles} files, ${index.duplicates.length} duplicate groups.`)
+  console.log('\n' + banner() + '\n')
+  console.log(rule())
+  console.log(`${PINK('▸')} Scanning ${chalk.bold(abs)}`)
+  const index = await withSpinner('Scanning', scan(abs))
+  console.log(
+    `  ${chalk.dim(`${index.totalFiles} files, ${index.duplicates.length} duplicate groups`)}`,
+  )
+  if (index.totalFiles > 300) {
+    console.log(chalk.dim('  (large folder — generating the plan can take a minute)'))
+  }
+  console.log(rule())
 
   const stamp = nowStamp()
   const quarantine = quarantineDir(stamp)
-  console.log(PINK(opts.claudeCode ? 'Asking Claude Code for a plan ...' : 'Asking Claude for a plan ...'))
-  const plan = await createPlan(index, intent, abs, quarantine, client)
+  const source = opts.claudeCode ? 'Claude Code' : 'Claude'
+  const plan = await withSpinner(
+    `Asking ${source} for a plan`,
+    createPlan(index, intent, abs, quarantine, client),
+  )
 
   console.log('\n' + renderPlan(plan) + '\n')
-  const answer = await ask(PINK('Apply this plan? [y/N] '))
+  console.log(rule())
+  const answer = await ask(`${PINK('▸')} Apply this plan? ${chalk.dim('[y/N]')} `)
   if (answer.toLowerCase() !== 'y') {
-    console.log('Aborted. Nothing changed.')
+    console.log(chalk.dim('Aborted. Nothing changed.'))
     return
   }
 
-  const log = await execute(plan, abs, quarantine, stamp)
+  const log = await withSpinner('Applying', execute(plan, abs, quarantine, stamp))
   const logPath = await saveUndoLog(log)
-  console.log(PINK(`Done. Run "sweep undo" to revert. (log: ${logPath})`))
+  console.log(`${PINK('✓')} Done. Run ${chalk.bold('sweep undo')} to revert.`)
+  console.log(chalk.dim(`  log: ${logPath}`))
 }
 
 async function runUndo() {
