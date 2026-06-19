@@ -7,7 +7,7 @@ import { VERSION } from './index.js'
 import { banner, PINK, renderPlan } from './render.js'
 import { scan } from './scanner.js'
 import { assertScannableTarget } from './safety.js'
-import { anthropicClient, createPlan } from './planner.js'
+import { anthropicClient, claudeCodeClient, createPlan, type PlanClient } from './planner.js'
 import { execute, applyUndo } from './executor.js'
 import { deleteUndoLog, loadLatestUndoLog, quarantineDir, saveUndoLog } from './store.js'
 import type { Intent, IntentMode } from './types.js'
@@ -23,11 +23,24 @@ function nowStamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-')
 }
 
-async function runTidy(target: string, opts: { mode?: string; instruction?: string }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    console.error(PINK('Set ANTHROPIC_API_KEY first (your Claude API key).'))
-    process.exit(1)
+async function runTidy(
+  target: string,
+  opts: { mode?: string; instruction?: string; claudeCode?: boolean },
+) {
+  let client: PlanClient
+  if (opts.claudeCode) {
+    client = claudeCodeClient()
+  } else {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.error(
+        PINK(
+          'Set ANTHROPIC_API_KEY (your Claude API key), or pass --claude-code to use your logged-in Claude Code subscription instead.',
+        ),
+      )
+      process.exit(1)
+    }
+    client = anthropicClient(apiKey)
   }
   const abs = resolve(target)
   assertScannableTarget(abs)
@@ -47,8 +60,8 @@ async function runTidy(target: string, opts: { mode?: string; instruction?: stri
 
   const stamp = nowStamp()
   const quarantine = quarantineDir(stamp)
-  console.log(PINK('Asking Claude for a plan ...'))
-  const plan = await createPlan(index, intent, abs, quarantine, anthropicClient(apiKey))
+  console.log(PINK(opts.claudeCode ? 'Asking Claude Code for a plan ...' : 'Asking Claude for a plan ...'))
+  const plan = await createPlan(index, intent, abs, quarantine, client)
 
   console.log('\n' + renderPlan(plan) + '\n')
   const answer = await ask(PINK('Apply this plan? [y/N] '))
@@ -80,6 +93,7 @@ program
   .argument('<path>', 'folder to tidy')
   .addOption(new Option('-m, --mode <mode>', 'clean | organize').choices(['clean', 'organize']).default('organize'))
   .option('-i, --instruction <text>', 'free-form instruction (custom mode)')
+  .option('-c, --claude-code', 'use your logged-in Claude Code session instead of an API key')
   .action((path, opts) => runTidy(path, opts))
 
 program.command('undo').description('revert the last run').action(runUndo)

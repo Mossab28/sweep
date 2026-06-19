@@ -27,6 +27,14 @@ ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep ~/Downloads
 
 That's it. sweep scans the folder, asks Claude for a tidy plan, shows it to you, and waits for your `y` before doing anything.
 
+### No API key? Use your Claude Code subscription
+
+If you have [Claude Code](https://claude.com/claude-code) installed and logged in, pass `--claude-code` (`-c`) and sweep will ask Claude through your existing subscription — no API key, no per-token cost:
+
+```bash
+npx @mossab/sweep ~/Downloads --claude-code
+```
+
 ---
 
 ## Usage
@@ -74,7 +82,7 @@ sweep undo
 ## Requirements
 
 - Node.js >= 20
-- A Claude API key (set via `ANTHROPIC_API_KEY` environment variable) — get one at [console.anthropic.com](https://console.anthropic.com/)
+- **Either** a Claude API key (set via `ANTHROPIC_API_KEY`) — get one at [console.anthropic.com](https://console.anthropic.com/) — **or** [Claude Code](https://claude.com/claude-code) installed and logged in, then run with `--claude-code`.
 
 ---
 

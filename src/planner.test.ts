@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { createPlan } from './planner.js'
+import { createPlan, stripFences } from './planner.js'
 import type { Index } from './types.js'
 
 const index: Index = {
@@ -34,6 +34,23 @@ test('rejects with friendly error when client returns non-JSON', async () => {
   await expect(
     createPlan(index, { mode: 'organize' }, '/tmp/target', '/tmp/.sweep/trash/x', client),
   ).rejects.toThrow(/valid plan/i)
+})
+
+test('stripFences removes a ```json fence and leaves bare JSON untouched', () => {
+  expect(stripFences('```json\n{"a":1}\n```')).toBe('{"a":1}')
+  expect(stripFences('```\n{"a":1}\n```')).toBe('{"a":1}')
+  expect(stripFences('{"a":1}')).toBe('{"a":1}')
+})
+
+test('accepts a plan even when the client wraps it in a markdown fence', async () => {
+  const client = {
+    complete: async () =>
+      '```json\n' +
+      JSON.stringify({ summary: 'tidy', operations: [{ op: 'mkdir', path: 'images' }] }) +
+      '\n```',
+  }
+  const plan = await createPlan(index, { mode: 'organize' }, '/tmp/target', '/tmp/.sweep/trash/x', client)
+  expect(plan.operations).toHaveLength(1)
 })
 
 test('rejects an out-of-bounds plan from the model', async () => {
