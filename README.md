@@ -29,6 +29,16 @@ Prefer the API? Set a [Claude API key](https://console.anthropic.com/) and add `
 ANTHROPIC_API_KEY=sk-ant-... npx @mossab/sweep --api
 ```
 
+### Install the `sweep` command everywhere
+
+Want `sweep` on your PATH (not just `npx`)? Install it straight from GitHub — it builds itself on install:
+
+```bash
+npm install -g github:Mossab28/sweep
+```
+
+Now run `sweep` from any folder. *(Once published to npm: `npm install -g @mossab/sweep`.)*
+
 sweep audits your content folders, shows a ranked report, and hands you a menu:
 
 ```text

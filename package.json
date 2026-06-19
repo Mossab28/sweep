@@ -11,6 +11,7 @@
     "test": "vitest run",
     "build": "tsup src/cli.ts --format esm --target node20 --clean",
     "dev": "tsx src/cli.ts",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
