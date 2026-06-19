@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import type { Plan } from './types.js'
+import type { Plan, Report } from './types.js'
 
 export const PINK = chalk.hex('#ff4fa3')
 
@@ -37,6 +37,27 @@ function boxed(title: string, body: string[]): string {
     (l) => PINK('│') + ' ' + l + ' '.repeat(contentW - vlen(l)) + ' ' + PINK('│'),
   )
   return [top, ...rows, bottom].join('\n')
+}
+
+export function sortedZones(report: Report): Report['zones'] {
+  return [...report.zones].sort((a, b) => a.priority - b.priority)
+}
+
+export function renderReport(report: Report): string {
+  const zones = sortedZones(report)
+  const body = zones.map(
+    (z, i) =>
+      `${PINK(`${i + 1})`)} ${chalk.bold(z.title)}  ${chalk.dim(z.reason)}`,
+  )
+  return PINK.bold(report.summary) + '\n\n' + boxedReport(body)
+}
+
+function boxedReport(body: string[]): string {
+  return boxed('Report', body.length ? body : [chalk.dim('Nothing notable found.')])
+}
+
+export function menuHint(): string {
+  return chalk.dim('Pick a number to tidy, ') + PINK('A') + chalk.dim(' to tidy all, ') + PINK('Q') + chalk.dim(' to quit')
 }
 
 export function renderPlan(plan: Plan): string {

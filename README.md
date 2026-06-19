@@ -39,6 +39,19 @@ npx @mossab/sweep ~/Downloads --claude-code
 
 ## Usage
 
+### Audit your whole computer
+
+Run sweep with no folder and it scans your content folders, reports where the
+clutter and gigabytes are (worst first), and lets you tidy them one at a time —
+or all at once:
+
+```bash
+sweep            # or: sweep --claude-code
+```
+
+Then pick a number to tidy that zone, `A` to tidy everything, or `Q` to quit.
+Tidying only ever touches your content folders, never system files.
+
 ### Modes
 
 ```bash

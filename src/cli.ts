@@ -5,13 +5,16 @@ import { stdin, stdout } from 'node:process'
 import { Command, Option } from 'commander'
 import chalk from 'chalk'
 import { VERSION } from './index.js'
-import { banner, PINK, renderPlan, rule } from './render.js'
+import { banner, PINK, renderPlan, rule, renderReport, menuHint, sortedZones } from './render.js'
 import { scan } from './scanner.js'
 import { assertScannableTarget } from './safety.js'
 import { anthropicClient, claudeCodeClient, createPlan, type PlanClient } from './planner.js'
 import { execute, applyUndo } from './executor.js'
 import { deleteUndoLog, loadLatestUndoLog, quarantineDir, saveUndoLog } from './store.js'
 import type { Intent, IntentMode } from './types.js'
+import { auditHome, defaultHome } from './audit.js'
+import { createReport } from './report.js'
+import { createStrategy, expandStrategy } from './strategy.js'
 
 async function ask(question: string): Promise<string> {
   const rl = createInterface({ input: stdin, output: stdout })
@@ -45,25 +48,100 @@ async function withSpinner<T>(label: string, work: Promise<T>): Promise<T> {
   }
 }
 
+function pickClient(opts: { claudeCode?: boolean }): PlanClient {
+  if (opts.claudeCode) return claudeCodeClient()
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    console.error(
+      PINK(
+        'Set ANTHROPIC_API_KEY (your Claude API key), or pass --claude-code to use your logged-in Claude Code session instead.',
+      ),
+    )
+    process.exit(1)
+  }
+  return anthropicClient(apiKey)
+}
+
+async function tidyZone(zonePath: string, client: PlanClient, source: string): Promise<void> {
+  assertScannableTarget(zonePath)
+  const index = await withSpinner(`Scanning ${zonePath}`, scan(zonePath))
+  const stamp = nowStamp()
+  const quarantine = quarantineDir(stamp)
+  const zone = {
+    path: zonePath,
+    name: zonePath.split('/').pop() || zonePath,
+    totalFiles: index.totalFiles,
+    totalBytes: index.totalBytes,
+    byType: index.byType,
+    approxDuplicateBytes: 0,
+    biggestFiles: [],
+    looseFileCount: index.files.length,
+  }
+  const strategy = await withSpinner(`Asking ${source} how to tidy`, createStrategy(zone, client))
+  const existing = new Set(index.files.map((f) => f.path))
+  const plan = expandStrategy(index, strategy, zonePath, quarantine, Date.now(), existing)
+  console.log('\n' + renderPlan(plan) + '\n')
+  console.log(rule())
+  const answer = await ask(`${PINK('▸')} Apply this plan? ${chalk.dim('[y/N]')} `)
+  if (answer.toLowerCase() !== 'y') {
+    console.log(chalk.dim('Skipped. Nothing changed.'))
+    return
+  }
+  const log = await withSpinner('Applying', execute(plan, zonePath, quarantine, stamp))
+  await saveUndoLog(log)
+  console.log(`${PINK('✓')} Tidied ${zonePath}. Run ${chalk.bold('sweep undo')} to revert.`)
+}
+
+async function runAudit(opts: { claudeCode?: boolean }): Promise<void> {
+  const client = pickClient(opts)
+  const source = opts.claudeCode ? 'Claude Code' : 'Claude'
+  console.log('\n' + banner() + '\n')
+  console.log(rule())
+  const home = defaultHome()
+  const audit = await withSpinner(`Auditing ${home}`, auditHome(home))
+  if (audit.zones.length === 0) {
+    console.log(chalk.dim('No tidyable content folders found.'))
+    return
+  }
+  const report = await withSpinner(`Asking ${source} for a report`, createReport(audit, client))
+  console.log('\n' + renderReport(report) + '\n')
+  console.log(rule())
+
+  const known = new Set(audit.zones.map((z) => z.path))
+  const zones = sortedZones(report).filter((z) => known.has(z.path))
+  if (zones.length === 0) {
+    console.log(chalk.dim('No tidyable zones in the report.'))
+    return
+  }
+  for (;;) {
+    console.log(menuHint())
+    const choice = (await ask(`${PINK('▸')} `)).trim().toLowerCase()
+    if (choice === 'q' || choice === '') return
+    if (choice === 'a') {
+      for (const z of zones) {
+        console.log(rule())
+        console.log(`${PINK('▸')} Tidying ${chalk.bold(z.title)}`)
+        await tidyZone(z.path, client, source)
+      }
+      console.log(`${PINK('✓')} All zones processed.`)
+      return
+    }
+    const n = Number(choice)
+    if (Number.isInteger(n) && n >= 1 && n <= zones.length) {
+      console.log(rule())
+      await tidyZone(zones[n - 1].path, client, source)
+      console.log(rule())
+    } else {
+      console.log(chalk.dim('Not a valid choice.'))
+    }
+  }
+}
+
 async function runTidy(
   target: string,
   opts: { mode?: string; instruction?: string; claudeCode?: boolean },
 ) {
-  let client: PlanClient
-  if (opts.claudeCode) {
-    client = claudeCodeClient()
-  } else {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      console.error(
-        PINK(
-          'Set ANTHROPIC_API_KEY (your Claude API key), or pass --claude-code to use your logged-in Claude Code subscription instead.',
-        ),
-      )
-      process.exit(1)
-    }
-    client = anthropicClient(apiKey)
-  }
+  const client = pickClient(opts)
   const abs = resolve(target)
   assertScannableTarget(abs)
 
@@ -124,11 +202,11 @@ const program = new Command()
 program.name('sweep').description('AI-powered file cleanup & organizer').version(VERSION)
 
 program
-  .argument('<path>', 'folder to tidy')
+  .argument('[path]', 'folder to tidy (omit to audit your whole computer)')
   .addOption(new Option('-m, --mode <mode>', 'clean | organize').choices(['clean', 'organize']).default('organize'))
   .option('-i, --instruction <text>', 'free-form instruction (custom mode)')
   .option('-c, --claude-code', 'use your logged-in Claude Code session instead of an API key')
-  .action((path, opts) => runTidy(path, opts))
+  .action((path, opts) => (path ? runTidy(path, opts) : runAudit(opts)))
 
 program.command('undo').description('revert the last run').action(runUndo)
 

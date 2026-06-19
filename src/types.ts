@@ -56,3 +56,79 @@ export interface UndoLog {
   target: string
   applied: AppliedOp[]
 }
+
+export type Category =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'document'
+  | 'archive'
+  | 'installer'
+  | 'code'
+  | 'data'
+  | 'other'
+
+export interface BigFile {
+  /** path relative to the zone root, POSIX-style */
+  path: string
+  bytes: number
+}
+
+export interface ZoneStat {
+  /** absolute path of the zone */
+  path: string
+  /** display name, e.g. "Downloads" */
+  name: string
+  totalFiles: number
+  totalBytes: number
+  byType: Record<string, { count: number; bytes: number }>
+  /** bytes that appear to be duplicated (same size), a cheap approximation */
+  approxDuplicateBytes: number
+  /** largest files in the zone, biggest first, capped */
+  biggestFiles: BigFile[]
+  /** files sitting directly in the zone root (not in a subfolder) */
+  looseFileCount: number
+}
+
+export interface OverviewItem {
+  label: string
+  bytes: number
+}
+
+export interface Audit {
+  /** absolute home directory the audit was run for */
+  home: string
+  zones: ZoneStat[]
+  /** coarse read-only "where the gigabytes are" consumers */
+  overview: OverviewItem[]
+  /** total bytes counted across scanned zones */
+  scannedBytes: number
+}
+
+export interface TargetFolder {
+  name: string
+  accepts: Category[]
+}
+
+export interface Strategy {
+  summary: string
+  folders: TargetFolder[]
+  quarantineDuplicates: boolean
+  quarantineJunk: boolean
+  renameMessy: boolean
+}
+
+export interface ReportZone {
+  /** absolute path of a tidyable zone */
+  path: string
+  title: string
+  reason: string
+  /** 1 = highest priority (worst), larger = lower priority */
+  priority: number
+  reclaimableHint?: string
+}
+
+export interface Report {
+  summary: string
+  zones: ReportZone[]
+}
